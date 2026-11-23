@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>الضفدع والنجمة</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#fff7e0;--ink:#3b2f1e;--cell:#d8f3dc;--chip:#fff;--tray:#ffe9a8;--go:#2dc653;--box:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1d2a2a;--ink:#f4efe2;--cell:#2d4a3a;--chip:#3a4747;--tray:#4a4630;--box:#26343a}}
+:root[data-theme="dark"]{--bg:#1d2a2a;--ink:#f4efe2;--cell:#2d4a3a;--chip:#3a4747;--tray:#4a4630;--box:#26343a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:10px;overflow:hidden}
+#top{display:flex;gap:14px;align-items:center;font-size:24px;min-height:34px}
+#dots span{display:inline-block;width:10px;height:10px;border-radius:50%;background:rgba(127,127,127,.35);margin:0 2px}
+#dots span.on{background:var(--go)}
+#board{position:relative;direction:ltr;--c:min(12vw,56px)}
+#grid{display:grid;gap:3px}
+.cell{width:var(--c);height:var(--c);background:var(--cell);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:calc(var(--c)*.6)}
+#frog{position:absolute;width:var(--c);height:var(--c);display:flex;align-items:center;justify-content:center;font-size:calc(var(--c)*.7);transition:left .4s,top .4s;pointer-events:none}
+.shake{animation:sh .4s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+#tray{direction:ltr;min-height:72px;width:100%;max-width:420px;background:var(--tray);border-radius:20px;padding:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{background:var(--chip);border-radius:14px;padding:4px 9px;font-size:26px}
+.row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+button{font-size:34px;border:0;border-radius:22px;background:var(--chip);color:var(--ink);min-width:72px;height:76px;box-shadow:0 4px 0 rgba(0,0,0,.2)}
+button:active{transform:translateY(3px);box-shadow:none}
+#go{background:var(--go);min-width:110px}
+.pulse{animation:pu 1.2s infinite}@keyframes pu{50%{transform:scale(1.1)}}
+.fx{position:fixed;top:-40px;font-size:34px;animation:fall 2s linear forwards;pointer-events:none}
+@keyframes fall{to{transform:translateY(110vh) rotate(360deg)}}
+#start{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:5}
+#start button{font-size:90px;width:200px;height:200px;border-radius:50%;background:var(--go)}
+#gear{position:fixed;top:calc(env(safe-area-inset-top,0px) + 6px);left:6px;font-size:16px;min-width:34px;height:34px;border-radius:50%;opacity:.3;box-shadow:none}
+#snd{position:fixed;top:calc(env(safe-area-inset-top,0px) + 6px);right:6px;font-size:20px;min-width:44px;height:44px;border-radius:50%;box-shadow:none;opacity:.7}
+#parent{position:fixed;inset:0;background:var(--box);z-index:6;padding:16px;overflow:auto;display:none;font-size:15px}
+pre{direction:ltr;text-align:left;background:rgba(127,127,127,.15);padding:12px;border-radius:12px;font-size:13px;overflow-x:auto}
+#parent button{font-size:15px;min-width:60px;height:38px;border-radius:12px}
+</style></head><body>
+<div id="start"><button id="play">▶️</button></div>
+<button id="gear">⚙️</button><button id="snd">🔊</button>
+<div id="top"><span id="dots"></span><span id="sc"></span></div>
+<div id="board"><div id="grid"></div><div id="frog">🐸</div></div>
+<div id="tray"></div>
+<div class="row"><div class="row" id="cards"></div></div>
+<div class="row"><button id="go">▶️</button><button id="clr">🗑️</button></div>
+<div id="parent">
+<div class="row" style="justify-content:flex-start"><button data-l="py">Python</button><button data-l="js">JavaScript</button><button data-l="c">C</button><button id="prev">◀</button><button id="next">▶</button><button id="close">✖</button></div>
+<p id="note"></p><pre id="code"></pre>
+</div>
+<script>
+const LV=[
+{w:4,h:1,g:[2,0],c:["R"],t:"تسلسل: الأوامر بتتنفذ بالترتيب"},
+{w:3,h:3,g:[2,2],c:["R","D"],t:"تسلسل بأكتر من اتجاه"},
+{w:7,h:1,g:[6,0],c:["R","X"],t:"تكرار (loop): نفس الأمر كذا مرة"},
+{w:5,h:4,g:[4,3],c:["R","D","X"],t:"تكرار مع اتجاهين"},
+{w:6,h:1,g:[5,0],r:[[1,0],[3,0]],c:["R","X","I"],t:"شرط (if): لو فيه حجر قدامك اقفز"},
+{w:5,h:3,g:[4,2],r:[[2,0],[2,1]],c:["R","D","X","I"],t:"شرط: اختار بين القفز واللف"},
+{w:5,h:1,g:[4,0],s:[[1,0],[2,0],[3,0]],c:["R","X"],n:3,t:"متغيّر (variable): عدّاد النجوم stars"},
+{w:4,h:3,g:[3,2],s:[[1,0],[3,0],[3,1]],c:["R","D","X"],n:3,t:"متغيّر: اجمع كل النجوم"},
+{w:6,h:3,g:[5,2],c:["F","R"],m:["R","R","D"],t:"دالة (function): كارت 💃 فيه خطوات جاهزة"},
+{w:7,h:4,g:[6,3],c:["F","R","D"],m:["R","R","D"],t:"دالة: استخدم نفس الكارت أكتر من مرة"},
+{w:6,h:3,g:[5,2],r:[[3,0]],s:[[1,0]],c:["R","D","X","I","F"],m:["R","D"],n:1,t:"دمج: تسلسل + تكرار + شرط + متغيّر + دالة"},
+{w:7,h:5,g:[6,4],r:[[2,2],[4,3]],s:[[1,0],[3,1],[5,2]],c:["R","D","X","I","F"],m:["R","D"],n:3,t:"التحدي الأخير"}];
+const HINT=["ساعد الضفدع يوصل للنجمة","","دوس على التكرار","","لو فيه حجر، اقفز","","اجمع النجوم","","الكارت ده فيه كذا خطوة","","",""];
+const IC={R:"➡️",D:"⬇️",X:"🔁",I:"🪨❓",F:"💃"};
+const V={R:[1,0],D:[0,1]},NM={R:"right",D:"down"};
+let lv=0,prog=[],busy=false,lang="py",taps=0,got=new Set();
+try{lv=Math.min(+localStorage.getItem("lv")||0,LV.length-1)}catch(e){}
+const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const has=(a,x,y)=>(a||[]).some(p=>p[0]==x&&p[1]==y);
+function say(t){if(!t)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang="ar-EG";u.rate=.9;speechSynthesis.speak(u)}catch(e){}}
+function place(x,y){const g=$("grid").children[0].getBoundingClientRect(),b=$("board").getBoundingClientRect(),f=$("frog");f.style.left=(g.left-b.left+x*(g.width+3))+"px";f.style.top=(g.top-b.top+y*(g.height+3))+"px"}
+function cells(){const L=LV[lv],g=$("grid");g.innerHTML="";for(let y=0;y<L.h;y++)for(let x=0;x<L.w;x++){const d=document.createElement("div");d.className="cell";d.id="c"+x+"_"+y;d.textContent=has([L.g],x,y)?"🏁":has(L.r,x,y)?"🪨":(has(L.s,x,y)&&!got.has(x+","+y))?"⭐":"";g.appendChild(d)}score()}
+function score(){const L=LV[lv];$("sc").textContent=L.n?"⭐ "+got.size+"/"+L.n:""}
+function load(speak){
+ const L=LV[lv];prog=[];busy=false;got=new Set();
+ $("grid").style.gridTemplateColumns="repeat("+L.w+",var(--c))";cells();
+ $("dots").innerHTML=LV.map((_,i)=>"<span"+(i<=lv?' class="on"':"")+"></span>").join("");
+ $("cards").innerHTML="";
+ L.c.forEach(k=>{const b=document.createElement("button");b.textContent=IC[k];b.onclick=()=>tap(k);$("cards").appendChild(b)});
+ draw();place(0,0);if(speak){sfx.lv();say(HINT[lv])}
+}
+function tap(k){
+ if(busy)return;sfx.pop();const t=prog[prog.length-1];
+ if(k=="X"){if(t&&t.n==1)t.n=3}
+ else if(k=="I"){if(t&&!t.m)t.i=true}
+ else if(prog.length<8)prog.push({d:k=="F"?"F":k,m:k=="F",n:1,i:false});
+ draw();
+}
+function draw(){
+ $("tray").innerHTML=prog.map(t=>'<span class="chip">'+(t.m?IC.F:IC[t.d])+(t.i?"🪨":"")+(t.n>1?"×"+t.n:"")+"</span>").join("");
+ $("go").classList.toggle("pulse",prog.length>0);
+}
+async function fail(x){$("frog").classList.add("shake");sfx.fail();say("جرب تاني");await sleep(500);$("frog").classList.remove("shake");got=new Set();cells();place(0,0);busy=false}
+async function go(){
+ if(busy||!prog.length)return;busy=true;const L=LV[lv];let x=0,y=0;got=new Set();cells();place(0,0);await sleep(300);
+ const steps=[];for(const t of prog)for(let i=0;i<t.n;i++)for(const d of(t.m?L.m:[t.d]))steps.push({d:d,i:t.i});
+ for(const s of steps){
+  const dx=V[s.d][0],dy=V[s.d][1];let k=1;
+  if(s.i&&has(L.r,x+dx,y+dy))k=2;
+  const nx=x+dx*k,ny=y+dy*k;
+  if(nx<0||ny<0||nx>=L.w||ny>=L.h||has(L.r,nx,ny)){await fail();return}
+  x=nx;y=ny;place(x,y);k==2?sfx.jump():sfx.hop();await sleep(450);
+  if(has(L.s,x,y)&&!got.has(x+","+y)){got.add(x+","+y);$("c"+x+"_"+y).textContent="";score();sfx.star()}
+ }
+ if(x==L.g[0]&&y==L.g[1]&&got.size>=(L.n||0))win();
+ else if(x==L.g[0]&&y==L.g[1]){say("لسه فيه نجوم");await sleep(600);got=new Set();cells();place(0,0);busy=false}
+ else await fail();
+}
+function win(){
+ sfx.win();say("برافو! الضفدع وصل");
+ for(let i=0;i<24;i++){const s=document.createElement("span");s.className="fx";s.textContent=["🎉","⭐","✨"][i%3];s.style.left=Math.random()*95+"vw";const dl=Math.random()*.6;s.style.animationDelay=dl+"s";sfx.tink(dl+.4+Math.random()*1.2);document.body.appendChild(s);setTimeout(()=>s.remove(),3000)}
+ setTimeout(()=>{
+  if(lv==LV.length-1){lv=0;save();$("play").textContent="🏆";$("start").style.display="flex";say("انت بطل البرمجة");return}
+  lv++;save();load(true)},2800);
+}
+function save(){try{localStorage.setItem("lv",lv)}catch(e){}}
+let AC,sg,mg,on=true,nt=0,st=0,mt=null;
+const SC=[523,587,659,784,880,1047],MEL=[0,2,4,2,3,2,1,0,0,2,4,5,4,2,3,-1],BS=[262,262,349,392];
+function ac(){try{if(!AC){AC=new(window.AudioContext||window.webkitAudioContext)();sg=AC.createGain();sg.gain.value=.5;sg.connect(AC.destination);mg=AC.createGain();mg.gain.value=.12;mg.connect(AC.destination)}if(AC.state=="suspended")AC.resume()}catch(e){}}
+function tone(f,t,d,ty,v,dst,f2){const o=AC.createOscillator(),g=AC.createGain();o.type=ty;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+.015);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(dst);o.start(t);o.stop(t+d+.05)}
+const S=fn=>{try{if(AC&&on)fn(AC.currentTime)}catch(e){}};
+const sfx={
+ pop:()=>S(t=>tone(600,t,.12,"sine",.6,sg,900)),
+ hop:()=>S(t=>tone(350,t,.2,"sine",.6,sg,700)),
+ jump:()=>S(t=>{tone(300,t,.3,"triangle",.6,sg,1000);tone(1200,t+.28,.15,"sine",.3,sg)}),
+ star:()=>S(t=>[988,1319,1568].forEach((f,i)=>tone(f,t+i*.08,.3,"sine",.6,sg))),
+ fail:()=>S(t=>{tone(330,t,.25,"triangle",.5,sg,220);tone(262,t+.2,.3,"triangle",.4,sg,180)}),
+ lv:()=>S(t=>[523,784].forEach((f,i)=>tone(f,t+i*.12,.25,"triangle",.5,sg))),
+ win:()=>S(t=>{[523,659,784,1047,1319].forEach((f,i)=>tone(f,t+i*.11,.4,"triangle",.6,sg));[523,659,784,1047].forEach(f=>tone(f,t+.6,1.2,"sine",.35,sg))}),
+ tink:d=>S(t=>tone(1500+Math.random()*1500,t+d,.2,"sine",.25,sg))
+};
+function sched(){if(!AC||!on)return;if(nt<AC.currentTime)nt=AC.currentTime+.05;while(nt<AC.currentTime+.3){const i=st%16,m=MEL[i];if(m>=0)tone(SC[m],nt,.5,"triangle",.5,mg);if(i%4==0)tone(BS[i/4],nt,1.5,"sine",.8,mg);nt+=.42;st++}}
+function music(){if(mt||!AC)return;nt=AC.currentTime+.1;mt=setInterval(sched,100)}
+document.addEventListener("visibilitychange",()=>{if(AC)document.hidden?AC.suspend():AC.resume()});
+const cam=a=>a.replace(/_(\w)/g,(m,c)=>c.toUpperCase());
+function call(d,j){const a=(j?"jump_":"move_")+NM[d];return lang=="js"?cam(a)+"();":lang=="c"?a+"();":a+"()"}
+function stmt(t,L){
+ let core;
+ if(t.m)core=lang=="py"?"combo()":"combo();";
+ else if(t.i)core=lang=="py"?"if rock_ahead():\n    "+call(t.d,1)+"\nelse:\n    "+call(t.d):"if (rock_ahead()) {\n    "+call(t.d,1)+"\n} else {\n    "+call(t.d)+"\n}";
+ else core=call(t.d);
+ if(t.n==1)return core;
+ const ind=core.split("\n").map(l=>"    "+l).join("\n");
+ return lang=="py"?"for i in range("+t.n+"):\n"+ind:"for ("+(lang=="c"?"int":"let")+" i = 0; i < "+t.n+"; i++) {\n"+ind+"\n}";
+}
+function code(){
+ const L=LV[lv];let head="",body=prog.map(t=>stmt(t,L));
+ if(L.m){const b=L.m.map(d=>"    "+call(d)).join("\n");head=lang=="py"?"def combo():\n"+b+"\n\n":(lang=="c"?"void":"function")+" combo() {\n"+b+"\n}\n\n"}
+ if(L.n){const v=lang=="py"?"stars = 0":lang=="js"?"let stars = 0;":"int stars = 0;";const cm=lang=="py"?"# ":"// ";body.unshift(v);body.push(cm+"stars goes up by 1 on every star")}
+ if(!body.length)body=[lang=="py"?"pass":"// ..."];
+ let out=body.join("\n");
+ if(lang=="c")out="int main() {\n"+out.split("\n").map(l=>"    "+l).join("\n")+"\n    return 0;\n}";
+ $("code").textContent=head+out;
+ $("note").textContent="مستوى "+(lv+1)+": "+L.t+" — اسأل الطفل: الضفدع محتاج يعمل إيه؟ من غير كلمة كود.";
+}
+$("play").onclick=()=>{ac();music();$("start").style.display="none";load(true)};
+$("snd").onclick=()=>{ac();on=!on;$("snd").textContent=on?"🔊":"🔇";if(AC){sg.gain.value=on?.5:0;mg.gain.value=on?.12:0}if(on)music()};
+$("go").onclick=go;
+$("clr").onclick=()=>{if(!busy){sfx.pop();prog=[];draw()}};
+$("gear").onclick=()=>{if(++taps>=3){taps=0;code();$("parent").style.display="block"}setTimeout(()=>taps=0,2000)};
+$("close").onclick=()=>$("parent").style.display="none";
+$("prev").onclick=()=>{if(lv>0){lv--;save();load();code()}};
+$("next").onclick=()=>{if(lv<LV.length-1){lv++;save();load();code()}};
+document.querySelectorAll("[data-l]").forEach(b=>b.onclick=()=>{lang=b.dataset.l;code()});
+addEventListener("resize",()=>{if(!busy)place(0,0)});
+</script></body></html>
